@@ -8,6 +8,7 @@
 
 import Cocoa
 import Foundation
+import HotKey
 
 struct Display {
     var id: CGDirectDisplayID
@@ -27,7 +28,7 @@ func ddcctl(monitor: CGDirectDisplayID, command: Int32, value: Int) {
 class SliderHandler : NSObject {
     var display : Display
     var command : Int32 = 0
-
+    
     public init(display: Display, command: Int32) {
         self.display = display
         self.command = command
@@ -67,7 +68,93 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var defaultDisplay: Display! = nil
     var defaultBrightnessSlider: NSSlider! = nil
     var defaultVolumeSlider: NSSlider! = nil
+    var prevVol: Int? = nil
 
+    var incHotKey: HotKey? {
+        didSet {
+            guard let incHotKey = incHotKey else {
+                print("Unregistered")
+                return
+            }
+            
+            print("Registered")
+            
+            incHotKey.keyDownHandler = {
+                print("Pressed at \(Date())")
+                let rel = +1
+                let command = AUDIO_SPEAKER_VOLUME
+                let k = "\(command)-\(self.defaultDisplay.serial)"
+                let value = max(0, min(100, prefs.integer(forKey: k) + rel))
+                
+                print("Setting to", value);
+                prefs.setValue(value, forKey: k)
+                prefs.synchronize()
+                
+                ddcctl(monitor: self.defaultDisplay.id, command: command, value: value)
+            }
+        }
+    }
+
+    var decHotKey: HotKey? {
+        didSet {
+            guard let decHotKey = decHotKey else {
+                print("Unregistered")
+                return
+            }
+            
+            print("Registered")
+            
+            decHotKey.keyDownHandler = {
+                print("Pressed minus at \(Date())")
+                let rel = -1
+                let command = AUDIO_SPEAKER_VOLUME
+                let k = "\(command)-\(self.defaultDisplay.serial)"
+                let value = max(0, min(100, prefs.integer(forKey: k) + rel))
+                
+                print("Setting to", value);
+                prefs.setValue(value, forKey: k)
+                prefs.synchronize()
+                
+                ddcctl(monitor: self.defaultDisplay.id, command: command, value: value)
+            }
+        }
+    }
+    
+    var muteHotKey: HotKey? {
+        didSet {
+            guard let muteHotKey = muteHotKey else {
+                print("Mute unregistered")
+                return
+            }
+            
+            print("Mute registered")
+            
+            muteHotKey.keyDownHandler = {
+                print("Pressed mute/unmute at \(Date())")
+                var value: Int! = nil;
+                if self.prevVol == nil {
+                    let command = AUDIO_SPEAKER_VOLUME
+                    let k = "\(command)-\(self.defaultDisplay.serial)"
+                    self.prevVol = prefs.integer(forKey: k);
+                    value = 0;
+                } else {
+                    value = self.prevVol;
+                    self.prevVol = nil;
+                }
+                
+                let command = AUDIO_SPEAKER_VOLUME
+                let k = "\(command)-\(self.defaultDisplay.serial)"
+                
+                print("Setting to", value);
+                prefs.setValue(value, forKey: k)
+                prefs.synchronize()
+                
+                ddcctl(monitor: self.defaultDisplay.id, command: command, value: value)
+            }
+        }
+    }
+    
+    
     @IBAction func quitClicked(_ sender: AnyObject) {
         NSApplication.shared().terminate(self)
     }
@@ -79,6 +166,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = statusMenu
 
         acquirePrivileges()
+        incHotKey = HotKey(keyCombo: KeyCombo(key: .equal, modifiers: [.control, .command, .option]))
+        decHotKey = HotKey(keyCombo: KeyCombo(key: .minus, modifiers: [.control, .command, .option]))
+        muteHotKey = HotKey(keyCombo: KeyCombo(key: .zero, modifiers: [.control, .command, .option]))
 
         CGDisplayRegisterReconfigurationCallback({_,_,_ in app.updateDisplays()}, nil)
         updateDisplays()

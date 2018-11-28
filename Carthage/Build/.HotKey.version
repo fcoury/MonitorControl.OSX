@@ -1,0 +1,18 @@
+{
+  "Mac" : [
+    {
+      "name" : "HotKey",
+      "hash" : "1643c9c848679e42077b00d05290defd56e3660be21f02091eed800cdd57dc43"
+    }
+  ],
+  "watchOS" : [
+
+  ],
+  "tvOS" : [
+
+  ],
+  "commitish" : "v0.1.1",
+  "iOS" : [
+
+  ]
+}
